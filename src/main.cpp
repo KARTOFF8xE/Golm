@@ -1,18 +1,39 @@
 #include <Arduino.h>
 
-// put function declarations here:
-int myFunction(int, int);
+const int dacPin = A0;
+const int clockwise = 12;
+const int counterClockwise = 13;
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+  Serial.begin(9600);
+
+  pinMode(clockwise, OUTPUT);
+  pinMode(counterClockwise, OUTPUT);
+  pinMode(dacPin, OUTPUT);
+
+  digitalWrite(clockwise, HIGH);
+  digitalWrite(counterClockwise, HIGH);
+  analogWrite(dacPin, 0);
+
+  
+  Serial.println("Pins set up.");
+  delay(5000);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-}
-
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+  Serial.println("Run.");
+  digitalWrite(clockwise, LOW);
+  for (int i = 0; i <= 255; i++){
+    analogWrite(dacPin, i);
+    printf("i: %d\n", i);
+    delay(5);
+  }
+  for (int i = 255; i >= 0; i--){
+    analogWrite(dacPin, i);
+    printf("i: %d\n", i);
+    delay(5);
+  }
+  analogWrite(dacPin, 0);
+  digitalWrite(clockwise, HIGH);
+  delay(2000);
 }
