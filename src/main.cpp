@@ -1,39 +1,69 @@
 #include <Arduino.h>
+#include <seesaw_neopixel.h>
+#include "Adafruit_seesaw.h"
 
-const int dacPin = A0;
-const int clockwise = 12;
-const int counterClockwise = 13;
+#include "config.cpp"
+#include "csd.cpp"
 
-void setup() {
-  Serial.begin(9600);
+Adafruit_seesaw ss;
+seesaw_NeoPixel sspixel = seesaw_NeoPixel(1, SS_NEOPIX, NEO_GRB + NEO_KHZ800);
+int32_t encoder_position;
 
+CSD* csd;
+
+void setupRotaryEncoder() {
+  Serial.println("Looking for seesaw!");
+  if (!ss.begin(SEESAW_ADDR) || !sspixel.begin(SEESAW_ADDR)) {
+    Serial.println("Couldn't find seesaw!");
+    while(1) delay(10);
+  }
+  Serial.println("Seesaw started");
+
+  uint32_t version = ((ss.getVersion() >> 16) & 0xFFFF);
+  Serial.print("Seesaw Version: ");
+  Serial.println(version);
+  
+  if (version != 4991) {
+    Serial.println("Wrong firmware!");
+    while(1) delay(10);
+  }
+
+  sspixel.setBrightness(20);
+  sspixel.show();
+
+  ss.pinMode(SS_SWITCH, INPUT_PULLUP);
+  encoder_position = ss.getEncoderPosition();
+  Serial.println("Turning on interrupts");
+  ss.setGPIOInterrupts((uint32_t)1 << SS_SWITCH, 1);
+  ss.enableEncoderInterrupt();
+}
+
+void setupCSD() {
   pinMode(clockwise, OUTPUT);
   pinMode(counterClockwise, OUTPUT);
   pinMode(dacPin, OUTPUT);
 
-  digitalWrite(clockwise, HIGH);
-  digitalWrite(counterClockwise, HIGH);
-  analogWrite(dacPin, 0);
+  csd = new CSD(dacPin);
+  csd->setDirection(clockwise);
+  csd->setVel(0);
+}
 
-  
-  Serial.println("Pins set up.");
-  delay(5000);
+void setup() {
+  Serial.begin(115200);
+  while (!Serial) delay(10);
+
+  setupRotaryEncoder();
+  setupCSD();
 }
 
 void loop() {
-  Serial.println("Run.");
-  digitalWrite(clockwise, LOW);
-  for (int i = 0; i <= 255; i++){
-    analogWrite(dacPin, i);
-    printf("i: %d\n", i);
-    delay(5);
+  int32_t new_position = ss.getEncoderPosition();
+
+  if (encoder_position != new_position) {
+    Serial.print("Encoder Pos: ");
+    Serial.println(new_position);
+    csd->setVel(new_position);
+    encoder_position = new_position;
   }
-  for (int i = 255; i >= 0; i--){
-    analogWrite(dacPin, i);
-    printf("i: %d\n", i);
-    delay(5);
-  }
-  analogWrite(dacPin, 0);
-  digitalWrite(clockwise, HIGH);
-  delay(2000);
+  delay(10);
 }
