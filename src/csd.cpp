@@ -18,6 +18,7 @@ class CSD {
 
     void setDirection(int direction) {
       if (direction != clockwise && direction != counterClockwise) return;
+      this->setVel(0);
 
       this->dir = direction;
       analogWrite(dacPin, 0);
@@ -43,7 +44,7 @@ class CSD {
       while (this->vel != newVel) {
         if (this->vel > newVel) decVel();
         else incVel();
-        delay(1);
+        delay(5);
       }
     }
 };
