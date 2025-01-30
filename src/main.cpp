@@ -1,150 +1,73 @@
 #include <Arduino.h>
+#include <WiFiS3.h>
 
-#include <seesaw_neopixel.h>
-#include "Adafruit_seesaw.h"
+const char* ssid = "Arduino_AP";  // ssid
+const char* password = "12345678"; // password
 
-// Pins and stuff for rotary encoder
-#define SS_SWITCH        24
-#define SS_NEOPIX        6
-#define SEESAW_ADDR          0x36
-Adafruit_seesaw ss;
-seesaw_NeoPixel sspixel = seesaw_NeoPixel(1, SS_NEOPIX, NEO_GRB + NEO_KHZ800);
-int32_t encoder_position;
-
-// Pins and stuff for CSD
-#define dacPin            A0
-#define clockwise         12
-#define counterClockwise  13
-
-class CSD {
-  private:
-    int pin;
-    int vel;
-    int dir;
-
-  public:
-    CSD(int pin) {
-      pin = pin;
-      vel = 0;
-      dir = -1;
-
-      setDirection(dir);
-    }
-
-    void setDirection(int direction) {
-      dir = direction;
-      analogWrite(dacPin, 0);
-      digitalWrite(clockwise, HIGH);
-      digitalWrite(counterClockwise, HIGH);
-      if (direction < 0) { return; }
-      digitalWrite(direction, LOW);
-    }
-
-    void incVel() {
-      if (vel < 255) {
-        analogWrite(dacPin, ++vel);
-      }
-    }
-
-    void decVel() {
-      if (vel > 0) {
-        analogWrite(dacPin, --vel);
-      }
-    }
-
-    void setVel(int32_t newVel) {
-      if (newVel > 255) {
-        newVel = 255;
-      } else if (newVel < 0) {
-        newVel = 0;
-      }
-
-      if (vel > newVel) {
-        while (vel >= newVel) {
-          decVel();
-          delay(1);
-        }
-        return;
-      }
-      if (vel < newVel) {
-        while (vel <= newVel) {
-          incVel();
-          delay(1);
-        }
-        return;
-      }
-    }
-};
-
-CSD csd(dacPin);
-
-// setupRotaryEncoder sets up the rotary encoder
-void setupRotaryEncoder() {
-  // search for seesaw rotary encoder
-  Serial.println("Looking for seesaw!");
-  if (! ss.begin(SEESAW_ADDR) || ! sspixel.begin(SEESAW_ADDR)) {
-    Serial.println("Couldn't find seesaw on default address");
-    while(1) delay(10);
-  }
-  Serial.println("seesaw started");
-
-  // lookup for correct Firmware
-  uint32_t version = ((ss.getVersion() >> 16) & 0xFFFF);
-  if (version  != 4991){
-    Serial.print("Wrong firmware loaded? ");
-    Serial.println(version);
-    while(1) delay(10);
-  }
-  Serial.println("Found Product 4991");
-
-  // set LED brightness
-  sspixel.setBrightness(20);
-  sspixel.show();
-  
-  // use a pin for the built in encoder switch
-  ss.pinMode(SS_SWITCH, INPUT_PULLUP);
-
-  // get starting position
-  encoder_position = ss.getEncoderPosition();
-
-  Serial.println("Turning on interrupts");
-  delay(10);
-  ss.setGPIOInterrupts((uint32_t)1 << SS_SWITCH, 1);
-  ss.enableEncoderInterrupt();
-}
-
-
-// setupCSD sets up the cordless screwdriver
-void setupCSD() {
-  pinMode(clockwise, OUTPUT);
-  pinMode(counterClockwise, OUTPUT);
-  pinMode(dacPin, OUTPUT);
-  csd.setDirection(-1);
-  csd.setVel(0);
-}
+WiFiServer server(80);
 
 void setup() {
-  // start Serial
-  Serial.begin(115200);
-  while (!Serial) delay(10);
+    Serial.begin(115200);
+    Serial.println("Starte Access Point...");
 
-  // setup components
-  setupRotaryEncoder();
-  setupCSD();
+    // create own wifi
+    WiFi.beginAP(ssid, password);
+    while (WiFi.status() != WL_AP_LISTENING) {
+        delay(500);
+        Serial.print(".");
+    }
 
-  csd.setDirection(clockwise);
+    Serial.println("\nAccess Point");
+    Serial.print("connect to: ");
+    Serial.println(ssid);
+    Serial.print("open in browser: http://");
+    Serial.println(WiFi.localIP());
+
+    server.begin();
 }
 
 void loop() {
-  int32_t new_position = ss.getEncoderPosition();
-  // did we move around?
-  if (encoder_position != new_position) {
-    csd.setVel(new_position);
-    encoder_position = new_position;      // and save for next round
-  }
-  // CSD_setVel(100);
+    WiFiClient client = server.available();
+    if (!client) {
+        return;
+    }
 
+    String request = "";
 
-  // don't overwhelm serial port
-  delay(1);
+    while (client.connected()) {
+        if (client.available()) {
+            char c = client.read();
+            request += c;
+            if (c == '\n') break;
+        }
+    }
+
+    // search for taken int-value
+    int value = -1;
+    int pos = request.indexOf("GET /submit?value=");
+    if (pos != -1) {
+        String valStr = request.substring(pos + 18);  // 18 characters for "GET /submit?value="
+        valStr = valStr.substring(0, valStr.indexOf(" "));
+        value = valStr.toInt();
+        Serial.print("Typed number: ");
+        Serial.println(value);
+    }
+
+    client.println("HTTP/1.1 200 OK");
+    client.println("Content-Type: text/html");
+    client.println();
+    client.println("<!DOCTYPE html>");
+    client.println("<html lang='de'><head><meta charset='UTF-8'>");
+    client.println("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+    client.println("<title>Arduino Eingabe</title>");
+    client.println("</head><body style='font-family: Arial, sans-serif;'>");
+    client.println("<h1>UNO R4 WiFi Access Point</h1>");
+    client.println("<p>Gib eine Zahl ein:</p>");
+    client.println("<form action='/submit' method='GET'>");
+    client.println("<input type='number' name='value' required>");
+    client.println("<input type='submit' value='Senden'>");
+    client.println("</form>");
+    client.println("</body></html>");
+    
+    client.stop();
 }
