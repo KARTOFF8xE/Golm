@@ -75,6 +75,19 @@ void setupWiFi() {
     server.begin();
 }
 
+volatile unsigned long lastInterruptTime = 0;
+void emergenyStop() {
+    unsigned long currentTime = millis();
+    if (currentTime - lastInterruptTime > 50) {
+        lastInterruptTime = currentTime;
+        
+        // attachInterrupt(digitalPinToInterrupt(1), emergenyStop, RISING);
+        attachInterrupt(digitalPinToInterrupt(2), emergenyStop, RISING);
+        csd->breakSpeed();
+        // Serial.println("Foo");
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     while (!Serial) delay(10);
@@ -82,6 +95,11 @@ void setup() {
     setupRotaryEncoder();
     setupCSD();
     setupWiFi();
+
+    pinMode(1, INPUT_PULLUP);
+    pinMode(2, INPUT_PULLUP);
+
+    attachInterrupt(digitalPinToInterrupt(2), emergenyStop, FALLING);
 }
 
 void loop() {
@@ -205,8 +223,8 @@ void loop() {
 
     // break and stop Buttons
     // client.println("<button onclick='sendBreak()'>Auf 0 Bremsen</button>");
-    client.println("<button onclick='sendBrake()'>Auf 0 Bremsen</button>");
-    client.println("<button class='stopButton' onclick='sendStop()'>Not Stop</button>");
+    client.println("<button onclick='sendBrake()'>Abbremsen auf 0</button>");
+    client.println("<button class='stopButton' onclick='sendStop()'>Notstop</button>");
 
     // JavaScript for asynchronous instrumentation
     client.println("<script>");

@@ -23,8 +23,9 @@ class CSD {
     void setDirection(int direction) {
       if (direction != clockwise && direction != counterClockwise) return;
 
+      this->breakSpeed();
       this->dir = direction;
-      analogWrite(dacPin, 0);
+      // analogWrite(dacPin, this->speed);
       digitalWrite(clockwise, HIGH);
       digitalWrite(counterClockwise, HIGH);
       digitalWrite(this->dir, LOW);
@@ -66,7 +67,9 @@ class CSD {
             delay(50);
             t_now = millis();
         } while(rotary_then == ss.getEncoderPosition());
-        Serial.println();
+        // if (this->minSpeed == 0) {
+        //   this->minSpeed = this->speed - 5;
+        // }
 
 
         double vel_current = 0.0;
