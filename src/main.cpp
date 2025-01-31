@@ -16,8 +16,8 @@ int32_t encoder_position;
 const char* ssid = "Arduino_AP";  // ssid
 const char* password = "12345678";  // pwd
 WiFiServer server(80);
-bool switchState = false;  // switch state, false is counterClockwise, true is Clockwise
-float inputVel = 0;  // velocity
+bool switchState = false;   // switch state, false is counterClockwise, true is Clockwise
+float inputVel = 0;         // velocity
 
 /***Cordless ScrewDriver***/
 CSD* csd;
@@ -145,6 +145,27 @@ void loop() {
         return;
     }
 
+    if (request.indexOf("GET /brake") != -1) {
+        csd->breakSpeed();
+        
+        // response to client
+        client.println("HTTP/1.1 200 OK");
+        client.println("Content-Type: text/plain");
+        client.stop();
+        return;
+    }
+
+    // Process stop request
+    if (request.indexOf("GET /stop") != -1) {
+        csd->setSpeed(0);
+        
+        // response to client
+        client.println("HTTP/1.1 200 OK");
+        client.println("Content-Type: text/plain");
+        client.stop();
+        return;
+    }
+
     // html page
     client.println("HTTP/1.1 200 OK");
     client.println("Content-Type: text/html");
@@ -163,7 +184,8 @@ void loop() {
     client.println(" left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }");
     client.println("input:checked + .slider { background-color: #4CAF50; }");
     client.println("input:checked + .slider:before { transform: translateX(26px); }");
-    client.println("input, button { margin: 10px; padding: 10px; font-size: 16px; }");
+    client.println("input, button { margin: 10px; padding: 10px; font-size: 16px; display: block; width: 200px; margin-left: auto; margin-right: auto; }");
+    client.println(".stopButton { background-color: red; color: white; }");
     client.println("</style>");
     client.println("</head><body>");
     client.println("<h1>UNO R4 WiFi Steuerung</h1>");
@@ -176,12 +198,17 @@ void loop() {
     client.println("</label>");
 
     // input number
-    client.println("<h2>Put Velocity</h2>");
+    client.println("<h2>Steuerung</h2>");
     client.println("<p>Current Vel: <strong id='numberDisplay'>" + String(inputVel) + "</strong></p>");
     client.println("<input type='number' id='numberInput' value='" + String(inputVel) + "'>");
-    client.println("<button onclick='sendNumber()'>Senden</button>");
+    client.println("<button onclick='sendNumber()'>Start</button>");
 
-    // JavaScript for asynchronus instrumentation
+    // break and stop Buttons
+    // client.println("<button onclick='sendBreak()'>Auf 0 Bremsen</button>");
+    client.println("<button onclick='sendBrake()'>Auf 0 Bremsen</button>");
+    client.println("<button class='stopButton' onclick='sendStop()'>Not Stop</button>");
+
+    // JavaScript for asynchronous instrumentation
     client.println("<script>");
     
     // Switch-Handling
@@ -198,6 +225,18 @@ void loop() {
     client.println("  fetch('/setnum?num=' + num)"); 
     client.println("    .then(response => response.text())");  
     client.println("    .then(data => { document.getElementById('numberDisplay').innerText = data; });");
+    client.println("}");
+
+    // Brake Button Handling
+    client.println("function sendBrake() {");
+    client.println("  fetch('/brake')"); // Sende eine Anfrage zum Bremsen
+    client.println("    .then(response => response.text())");
+    client.println("}");
+
+    // Stop Button Handling
+    client.println("function sendStop() {");
+    client.println("  fetch('/stop')"); // Sende eine Anfrage zum Stoppen
+    client.println("    .then(response => response.text())");
     client.println("}");
     
     client.println("</script>");

@@ -89,7 +89,7 @@ class CSD {
     void breakSpeed() {
         for (speed; speed >= 0; speed--) {
             this->decSpeed();
-            delay(5);
+            delay(10);
         }
     }
 };
