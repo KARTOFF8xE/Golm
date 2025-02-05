@@ -53,6 +53,10 @@ void setupCSD() {
     pinMode(clockwise, OUTPUT);
     pinMode(counterClockwise, OUTPUT);
     pinMode(dacPin, OUTPUT);
+    pinMode(4, OUTPUT);
+
+    // digitalWrite(4, HIGH);
+    digitalWrite(4, LOW);
 
     csd = new CSD(dacPin);
     csd->setDirection(clockwise);
@@ -129,14 +133,14 @@ void loop() {
             switchState = (stateStr == "1");
         }
         Serial.print("Direction: ");
-        Serial.println(switchState ? "clockwise" : "counterClockwise");
-        csd->setDirection(switchState ? clockwise : counterClockwise);
+        Serial.println(switchState ? "counterClockwise" : "clockwise");
+        csd->setDirection(switchState ? counterClockwise : clockwise);
 
         // response to client
         client.println("HTTP/1.1 200 OK");
         client.println("Content-Type: text/plain");
         client.println();
-        client.println(switchState ? "clockwise" : "counterClockwise");
+        client.println(switchState ? "counterClockwise" : "clockwise");
         client.stop();
         return;
     }
@@ -152,6 +156,7 @@ void loop() {
         }
         Serial.print("Input: ");
         Serial.println(inputVel);
+        // digitalWrite(4, LOW);
         csd->accelerateToVel(inputVel, ss);
 
         // response number
@@ -209,7 +214,7 @@ void loop() {
     client.println("<h1>UNO R4 WiFi Steuerung</h1>");
 
     // toggle on/off
-    client.println("<p>Switch Status: <strong id='switchStateText'>" + String(switchState ? "clockwise" : "counterClockwise") + "</strong></p>");
+    client.println("<p>Switch Status: <strong id='switchStateText'>" + String(switchState ? "counterClockwise" : "clockwise") + "</strong></p>");
     client.println("<label class='switch'>");
     client.println("<input type='checkbox' id='toggleSwitch' " + String(switchState ? "checked" : "") + ">");
     client.println("<span class='slider'></span>");

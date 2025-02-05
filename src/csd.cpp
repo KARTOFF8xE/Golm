@@ -33,7 +33,9 @@ class CSD {
 
     void incSpeed() {
       if (this->speed < 255) {
-        analogWrite(dacPin, ++this->speed);
+        this->speed += 10;
+        if (this->speed > 255) { this->speed = 255; }
+        analogWrite(dacPin, this->speed);
       }
     }
 
@@ -94,5 +96,6 @@ class CSD {
             this->decSpeed();
             delay(10);
         }
+        // digitalWrite(4, HIGH);
     }
 };
