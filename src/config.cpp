@@ -7,3 +7,4 @@
 #define dacPin            A0
 #define clockwise         12
 #define counterClockwise  13
+#define accSpeed 15

@@ -7,6 +7,7 @@
 
 #include "config.cpp"
 
+
 class CSD {
   private:
     int pin;
@@ -33,7 +34,7 @@ class CSD {
 
     void incSpeed() {
       if (this->speed < 255) {
-        this->speed += 10;
+        this->speed += accSpeed;
         if (this->speed > 255) { this->speed = 255; }
         analogWrite(dacPin, this->speed);
       }
@@ -73,7 +74,6 @@ class CSD {
         //   this->minSpeed = this->speed - 5;
         // }
 
-
         double vel_current = 0.0;
         rotary_now = ss.getEncoderPosition();
         rotary_then = rotary_now;
@@ -89,6 +89,10 @@ class CSD {
             }
             rotary_now = ss.getEncoderPosition();
         } while (vel_current <= vel && this->speed < 256);
+    }
+
+    bool drive(Adafruit_seesaw ss) {
+      if (ss.getEncoderPosition() >= abs(64));
     }
 
     void breakSpeed() {

@@ -8,8 +8,8 @@
 #include "config.cpp"
 #include "csd.cpp"
 
-/***Seesaw***/
 
+/***Seesaw***/
 Adafruit_seesaw ss;
 seesaw_NeoPixel sspixel = seesaw_NeoPixel(1, SS_NEOPIX, NEO_GRB + NEO_KHZ800);
 int32_t encoder_position;
@@ -24,6 +24,7 @@ float inputVel = 0;         // velocity
 
 /***Cordless ScrewDriver***/
 CSD* csd;
+bool driving = false;
 
 void setupRotaryEncoder() {
     Serial.println("Looking for seesaw!");
@@ -160,7 +161,9 @@ void loop() {
         Serial.print("Input: ");
         Serial.println(inputVel);
         // digitalWrite(4, LOW);
+        ss.setEncoderPosition(0);
         csd->accelerateToVel(inputVel, ss);
+        driving = true;
 
         // response number
         client.println("HTTP/1.1 200 OK");
@@ -170,6 +173,11 @@ void loop() {
         client.stop();
         return;
     }
+
+    if (driving) {
+        if (csd->drive(ss)) csd->breakSpeed();
+    }
+
 
     if (request.indexOf("GET /brake") != -1) {
         csd->breakSpeed();
