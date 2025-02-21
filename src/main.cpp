@@ -2,15 +2,18 @@
 #include <seesaw_neopixel.h>
 #include "Adafruit_seesaw.h"
 
+
 #include <WiFiS3.h>
 
 #include "config.cpp"
 #include "csd.cpp"
 
 /***Seesaw***/
+
 Adafruit_seesaw ss;
 seesaw_NeoPixel sspixel = seesaw_NeoPixel(1, SS_NEOPIX, NEO_GRB + NEO_KHZ800);
 int32_t encoder_position;
+
 
 /***WiFi***/
 const char* ssid = "Arduino_AP";  // ssid
