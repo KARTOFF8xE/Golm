@@ -24,7 +24,6 @@ float inputVel = 0;         // velocity
 
 /***Cordless ScrewDriver***/
 CSD* csd;
-bool driving = false;
 
 void setupRotaryEncoder() {
     Serial.println("Looking for seesaw!");
@@ -160,10 +159,7 @@ void loop() {
         }
         Serial.print("Input: ");
         Serial.println(inputVel);
-        // digitalWrite(4, LOW);
-        ss.setEncoderPosition(0);
-        csd->accelerateToVel(inputVel, ss);
-        driving = true;
+        csd->state = SETUP;
 
         // response number
         client.println("HTTP/1.1 200 OK");
@@ -174,9 +170,11 @@ void loop() {
         return;
     }
 
-    if (driving) {
-        if (csd->drive(ss)) csd->breakSpeed();
-    }
+    if (csd->state == SETUP) { csd->setup(ss); csd->state = STARTUP; };
+    if (csd->state == STARTUP) if (csd->startup(ss)) csd->state = ACCELERATING;
+    if (csd->state == ACCELERATING) if (csd->accelerateToVel(inputVel, ss)) csd->state = DRIVING;
+    if (csd->state == DRIVING) if (csd->drive(ss)) csd->state = BREAKING;
+    if (csd->state == BREAKING) if (csd->breakSpeed()) csd->state = SLEEP;
 
 
     if (request.indexOf("GET /brake") != -1) {

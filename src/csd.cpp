@@ -8,17 +8,31 @@
 #include "config.cpp"
 
 
+enum State {
+  SETUP,
+  STARTUP,
+  ACCELERATING,
+  DRIVING,
+  BREAKING,
+  SLEEP,
+};
+
 class CSD {
   private:
     int pin;
     int speed;
     int dir;
+    int t_then, t_now;
+    int encoder_then, encoder_now;
 
   public:
+    State state;
+
     CSD(int pin) {
       this->pin = pin;
       this->speed = 0;
       this->dir = -1;
+      this->state = SLEEP;
     }
 
     void setDirection(int direction) {
@@ -59,47 +73,52 @@ class CSD {
       return speed;
     }
 
+    void setup(Adafruit_seesaw ss) {
+      ss.setEncoderPosition(0);
+      this->encoder_then = ss.getEncoderPosition();
+      this->encoder_now = ss.getEncoderPosition();
+      this->t_then = 0;
+      this->t_now = 0;
+    }
+
+    // returns if already turning
+    bool startup(Adafruit_seesaw ss) {
+      this->t_now = millis();
+      if (this->t_now - this->t_then >= 50) {
+        this->incSpeed();
+        this->t_then = this->t_now;
+      }
+
+      return (this->encoder_then != ss.getEncoderPosition()) ? true : false;
+    }
+
     // Takes vel in km/h and rotary-sensor
-    void accelerateToVel(float vel, Adafruit_seesaw ss) {
-        vel = vel / 3.6;
-        ss.setEncoderPosition(0);
-        int rotary_now, rotary_then = ss.getEncoderPosition();
-        int t_now, t_then = 0;
-        do {
-            this->incSpeed();
-            delay(50);
-            t_now = millis();
-        } while(rotary_then == ss.getEncoderPosition());
-        // if (this->minSpeed == 0) {
-        //   this->minSpeed = this->speed - 5;
-        // }
-
+    bool accelerateToVel(float vel, Adafruit_seesaw ss) {
         double vel_current = 0.0;
-        rotary_now = ss.getEncoderPosition();
-        rotary_then = rotary_now;
-        do {
-            if (rotary_now != rotary_then) {
-                t_then = t_now;
-                t_now = millis();
-            
-                this->incSpeed();
+        if (this->encoder_now != this->encoder_then) {
+          this->t_then = this->t_now;
+          this->t_now = millis();
+          vel_current = (abs(this->encoder_now - this->encoder_then) * 3.14 * 10) / (t_now - t_then);
+          
+          if (vel_current * 3.6 >= vel || this->speed >= 256) return true;
 
-                vel_current = (abs(rotary_now - rotary_then) * 3.14 * 10) / ((t_now - t_then));
-                rotary_then = rotary_now;
-            }
-            rotary_now = ss.getEncoderPosition();
-        } while (vel_current <= vel && this->speed < 256);
+          this->encoder_then = this->encoder_now;
+          this->incSpeed();
+        }
+        this->encoder_now = ss.getEncoderPosition();
+
+        return false;
     }
 
     bool drive(Adafruit_seesaw ss) {
-      if (ss.getEncoderPosition() >= abs(64));
+      return (ss.getEncoderPosition() >= abs(64));
     }
 
-    void breakSpeed() {
-        for (speed; speed >= 0; speed--) {
-            this->decSpeed();
-            delay(10);
-        }
-        // digitalWrite(4, HIGH);
+    bool breakSpeed() {
+      for (speed; speed >= 0; speed--) {
+          this->decSpeed();
+          delay(10);
+      }
+      return true;
     }
 };
