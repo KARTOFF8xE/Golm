@@ -14,6 +14,7 @@ enum State {
   ACCELERATING,
   DRIVING,
   BREAKING,
+  TOGGLE,
   SLEEP,
 };
 
@@ -74,32 +75,36 @@ class CSD {
     }
 
     void setup(Adafruit_seesaw ss) {
+      // Serial.println("setup");
       ss.setEncoderPosition(0);
       this->encoder_then = ss.getEncoderPosition();
       this->encoder_now = ss.getEncoderPosition();
       this->t_then = 0;
       this->t_now = 0;
+      this->setSpeed(0);
     }
 
     // returns if already turning
     bool startup(Adafruit_seesaw ss) {
+      // Serial.println("startup");
       this->t_now = millis();
       if (this->t_now - this->t_then >= 50) {
         this->incSpeed();
         this->t_then = this->t_now;
       }
-
+      delay(10);
       return (this->encoder_then != ss.getEncoderPosition()) ? true : false;
     }
 
     // Takes vel in km/h and rotary-sensor
     bool accelerateToVel(float vel, Adafruit_seesaw ss) {
+      // Serial.println("accelerateToVel");
         double vel_current = 0.0;
         if (this->encoder_now != this->encoder_then) {
           this->t_then = this->t_now;
           this->t_now = millis();
           vel_current = (abs(this->encoder_now - this->encoder_then) * 3.14 * 10) / (t_now - t_then);
-          
+
           if (vel_current * 3.6 >= vel || this->speed >= 256) return true;
 
           this->encoder_then = this->encoder_now;
@@ -111,7 +116,7 @@ class CSD {
     }
 
     bool drive(Adafruit_seesaw ss) {
-      return (ss.getEncoderPosition() >= abs(64));
+      return (abs(ss.getEncoderPosition()) >= abs(32));
     }
 
     bool breakSpeed() {
@@ -120,5 +125,10 @@ class CSD {
           delay(10);
       }
       return true;
+    }
+
+    void toggle() {
+      if (this->dir == clockwise) this->setDirection(counterClockwise);
+      else this->setDirection(clockwise);
     }
 };
