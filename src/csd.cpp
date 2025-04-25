@@ -88,23 +88,21 @@ class CSD {
     bool startup(Adafruit_seesaw ss) {
       // Serial.println("startup");
       this->t_now = millis();
-      if (this->t_now - this->t_then >= 50) {
+      if (this->t_now - this->t_then >= 75) {
         this->incSpeed();
         this->t_then = this->t_now;
       }
-      delay(10);
       return (this->encoder_then != ss.getEncoderPosition()) ? true : false;
     }
 
     // Takes vel in km/h and rotary-sensor
     bool accelerateToVel(float vel, Adafruit_seesaw ss) {
-      // Serial.println("accelerateToVel");
+      Serial.println("accelerateToVel");
         double vel_current = 0.0;
         if (this->encoder_now != this->encoder_then) {
           this->t_then = this->t_now;
           this->t_now = millis();
           vel_current = (abs(this->encoder_now - this->encoder_then) * 3.14 * 10) / (t_now - t_then);
-
           if (vel_current * 3.6 >= vel || this->speed >= 256) return true;
 
           this->encoder_then = this->encoder_now;
@@ -112,11 +110,30 @@ class CSD {
         }
         this->encoder_now = ss.getEncoderPosition();
 
-        return false;
+      return false;
+    }
+
+    // Takes speed
+    bool accelerateToSpeed(int goalSpeed) {
+      Serial.println("accelerateToSpeed");
+      Serial.print(this->speed);
+      Serial.print(" : ");
+      Serial.print(goalSpeed);
+      if (this->speed >= goalSpeed || this->speed >= 256) {
+        Serial.println(" DOOOOOOOOOOOOOOOOOOOOOOOOONE"); return true;
+      }
+      this->t_now = millis();
+      if (this->t_now-this->t_then > 100)
+      {
+        this->incSpeed();
+        this->t_then = this->t_now;
+      }
+      Serial.println(" accelerated");
+      return false;
     }
 
     bool drive(Adafruit_seesaw ss) {
-      return (abs(ss.getEncoderPosition()) >= abs(32));
+      return (abs(ss.getEncoderPosition()) >= abs(200));
     }
 
     bool breakSpeed() {

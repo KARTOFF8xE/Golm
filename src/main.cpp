@@ -13,14 +13,13 @@
 Adafruit_seesaw ss;
 seesaw_NeoPixel sspixel = seesaw_NeoPixel(1, SS_NEOPIX, NEO_GRB + NEO_KHZ800);
 int32_t encoder_position;
-
+int inputSpeed = 0;         // velocity
 
 /***WiFi***/
 const char* ssid = "Arduino_AP";  // ssid
 const char* password = "12345678";  // pwd
 WiFiServer server(80);
 bool switchState = false;   // switch state, false is counterClockwise, true is Clockwise
-float inputVel = 0;         // velocity
 
 /***Cordless ScrewDriver***/
 CSD* csd;
@@ -91,7 +90,6 @@ void emergenyStop() {
         // attachInterrupt(digitalPinToInterrupt(1), emergenyStop, RISING);
         attachInterrupt(digitalPinToInterrupt(2), emergenyStop, RISING);
         csd->breakSpeed();
-        // Serial.println("Foo");
     }
 }
 
@@ -103,17 +101,17 @@ void setup() {
     setupCSD();
     setupWiFi();
 
-    pinMode(1, INPUT_PULLUP);
-    pinMode(2, INPUT_PULLUP);
+    pinMode(toggleBtn1, INPUT_PULLUP);
+    pinMode(toggleBtn2, INPUT_PULLUP);
 
-    attachInterrupt(digitalPinToInterrupt(2), emergenyStop, FALLING);
+    // attachInterrupt(digitalPinToInterrupt(2), emergenyStop, FALLING);
 }
 
 void loop() {
     // Serial.print("_");
     // Serial.print(csd->state);
     WiFiClient client = server.available();
-    if (client) { // Prüfen, ob ein Client verbunden ist
+    if (client) { // check if client connected
         Serial.println("Neuer Client verbunden!");
 
         String request = "";
@@ -136,7 +134,7 @@ void loop() {
         Serial.print("Anfrage erhalten: ");
         Serial.println(request);
 
-        // **Verarbeitung der Anfrage**
+        // **processing request**
         if (request.indexOf("GET /toggle") != -1) {
             int pos = request.indexOf("state=");
             if (pos != -1) {
@@ -160,10 +158,10 @@ void loop() {
                 int start = pos + 4;
                 String numStr = request.substring(start);
                 numStr = numStr.substring(0, numStr.indexOf(" "));
-                inputVel = numStr.toFloat();
+                inputSpeed = numStr.toInt();
             }
             Serial.print("Input: ");
-            Serial.println(inputVel);
+            Serial.println(inputSpeed);
             csd->state = SETUP;
             Serial.println(csd->state);
 
@@ -171,7 +169,7 @@ void loop() {
             client.println("HTTP/1.1 200 OK");
             client.println("Content-Type: text/plain");
             client.println();
-            client.println(String(inputVel));
+            client.println(String(inputSpeed));
         }
 
         else if (request.indexOf("GET /brake") != -1) {
@@ -190,7 +188,7 @@ void loop() {
             client.println();
         }
 
-        // **Vollständige HTML-Seite zurücksenden**
+        // **html**
         else {
             client.println("HTTP/1.1 200 OK");
             client.println("Content-Type: text/html");
@@ -215,24 +213,24 @@ void loop() {
             client.println("</head><body>");
             client.println("<h1>UNO R4 WiFi Steuerung</h1>");
 
-            // Toggle-Schalter
+            // Toggle-Button
             client.println("<p>Switch Status: <strong id='switchStateText'>" + String(switchState ? "counterClockwise" : "clockwise") + "</strong></p>");
             client.println("<label class='switch'>");
             client.println("<input type='checkbox' id='toggleSwitch' " + String(switchState ? "checked" : "") + ">");
             client.println("<span class='slider'></span>");
             client.println("</label>");
 
-            // Eingabefeld für Geschwindigkeit
+            // velocity-field
             client.println("<h2>Steuerung</h2>");
-            client.println("<p>Current Vel: <strong id='numberDisplay'>" + String(inputVel) + "</strong></p>");
-            client.println("<input type='number' id='numberInput' value='" + String(inputVel) + "'>");
+            client.println("<p>Current Vel: <strong id='numberDisplay'>" + String(inputSpeed) + "</strong></p>");
+            client.println("<input type='number' id='numberInput' value='" + String(inputSpeed) + "'>");
             client.println("<button onclick='sendNumber()'>Start</button>");
 
-            // Brems- und Notstop-Buttons
+            // break and emergency-buttons
             client.println("<button onclick='sendBrake()'>Abbremsen auf 0</button>");
             client.println("<button class='stopButton' onclick='sendStop()'>Notstop</button>");
 
-            // JavaScript für Steuerung
+            // javascript for control
             client.println("<script>");
             client.println("document.getElementById('toggleSwitch').addEventListener('change', function() {");
             client.println("  let state = this.checked ? '1' : '0';");
@@ -262,16 +260,20 @@ void loop() {
             client.println("</body></html>");
         }
 
-        // Verbindung schließen, damit ein neuer Client sich verbinden kann
+        // close connection
         client.stop();
         Serial.println("Client getrennt.");
     }
 
-    // **Hauptprogramm weiterlaufen lassen**
+    // **State-Machine**
     if (csd->state == SETUP) { csd->setup(ss); csd->state = STARTUP; };
     if (csd->state == STARTUP) if (csd->startup(ss)) csd->state = ACCELERATING;
-    if (csd->state == ACCELERATING) if (csd->accelerateToVel(inputVel, ss)) csd->state = DRIVING;
+    // if (csd->state == ACCELERATING) if (csd->accelerateToVel(inputVel, ss)) csd->state = DRIVING;
+    if (csd->state == ACCELERATING) if (csd->accelerateToSpeed(inputSpeed)) csd->state = DRIVING;
     if (csd->state == DRIVING) if (csd->drive(ss)) csd->state = BREAKING;
+    if (!digitalRead(toggleBtn1)) csd->state = BREAKING;
+    if (!digitalRead(toggleBtn2)) csd->state = BREAKING;
     if (csd->state == BREAKING) { if (csd->breakSpeed()) csd->state = TOGGLE; }
     if (csd->state == TOGGLE) { csd->toggle(); csd->state = SETUP; }
+    Serial.println(csd->getSpeed());
 }
