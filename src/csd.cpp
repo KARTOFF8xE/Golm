@@ -10,7 +10,8 @@
 
 enum State {
   INITIALSETUP,
-  CALIBRATE,
+  CALIBRATESPEED,
+  CALIBRATEPOSITION,
   SETUP,
   STARTUP,
   ACCELERATING,
@@ -86,7 +87,7 @@ class CSD {
       this->setSpeed(0);
     }
 
-    bool calibrate(Adafruit_seesaw ss) {
+    bool calibrateSpeed(Adafruit_seesaw ss) {
       this->t_now = millis();
       if (this->t_now - this->t_then >= 1000) {
         this->incSpeed(calibrationSpeed);
@@ -100,6 +101,18 @@ class CSD {
       Serial.println(this->initial_speed);
       
       return false;
+    }
+
+    bool calibratePosition() {
+      setSpeed(this->initial_speed);
+      if (digitalRead(toggleBtn1) == 0) {
+        setSpeed(0);
+        toggleDir();
+        Serial.println("calibrated Position");
+        return false;
+      }
+
+      return true;
     }
 
     void setup(Adafruit_seesaw ss) {
@@ -177,7 +190,7 @@ class CSD {
       return true;
     }
 
-    void toggle() {
+    void toggleDir() {
       if (this->dir == clockwise) this->setDirection(counterClockwise);
       else this->setDirection(clockwise);
     }

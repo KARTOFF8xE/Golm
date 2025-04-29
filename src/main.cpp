@@ -113,10 +113,10 @@ void loop() {
     WiFiClient client = server.available();
     if (client) { // check if client connected
         Serial.println("Neuer Client verbunden!");
-
+    
         String request = "";
         unsigned long startTime = millis();
-        
+    
         while (client.connected()) {
             if (client.available()) {
                 char c = client.read();
@@ -130,10 +130,10 @@ void loop() {
                 break;
             }
         }
-
+    
         Serial.print("Anfrage erhalten: ");
         Serial.println(request);
-
+    
         // **processing request**
         if (request.indexOf("GET /toggle") != -1) {
             int pos = request.indexOf("state=");
@@ -145,13 +145,13 @@ void loop() {
             Serial.print("Direction: ");
             Serial.println(switchState ? "counterClockwise" : "clockwise");
             csd->setDirection(switchState ? counterClockwise : clockwise);
-
+    
             client.println("HTTP/1.1 200 OK");
             client.println("Content-Type: text/plain");
             client.println();
             client.println(switchState ? "counterClockwise" : "clockwise");
         }
-
+    
         else if (request.indexOf("GET /setnum") != -1) {
             int pos = request.indexOf("num=");
             if (pos != -1) {
@@ -162,32 +162,39 @@ void loop() {
             }
             Serial.print("Input: ");
             Serial.println(inputVel);
-            csd->state = INITIALSETUP;
-            Serial.println(csd->state);
-
-
+            csd->state = SETUP;
+    
             client.println("HTTP/1.1 200 OK");
             client.println("Content-Type: text/plain");
             client.println();
             client.println(String(inputVel));
         }
-
+    
         else if (request.indexOf("GET /brake") != -1) {
             csd->breakSpeed();
-
+    
             client.println("HTTP/1.1 200 OK");
             client.println("Content-Type: text/plain");
             client.println();
         }
-
+    
         else if (request.indexOf("GET /stop") != -1) {
             csd->setSpeed(0);
-
+    
             client.println("HTTP/1.1 200 OK");
             client.println("Content-Type: text/plain");
             client.println();
         }
-
+    
+        else if (request.indexOf("GET /calibrate") != -1) {
+            csd->state = INITIALSETUP;
+    
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-Type: text/plain");
+            client.println();
+            client.println("Kalibrierung gestartet");
+        }
+    
         // **html**
         else {
             client.println("HTTP/1.1 200 OK");
@@ -212,24 +219,27 @@ void loop() {
             client.println("</style>");
             client.println("</head><body>");
             client.println("<h1>UNO R4 WiFi Steuerung</h1>");
-
+    
             // Toggle-Button
             client.println("<p>Switch Status: <strong id='switchStateText'>" + String(switchState ? "counterClockwise" : "clockwise") + "</strong></p>");
             client.println("<label class='switch'>");
             client.println("<input type='checkbox' id='toggleSwitch' " + String(switchState ? "checked" : "") + ">");
             client.println("<span class='slider'></span>");
             client.println("</label>");
-
+    
             // velocity-field
             client.println("<h2>Steuerung</h2>");
             client.println("<p>Current Vel: <strong id='numberDisplay'>" + String(inputVel) + "</strong></p>");
             client.println("<input type='number' id='numberInput' value='" + String(inputVel) + "'>");
             client.println("<button onclick='sendNumber()'>Start</button>");
-
+    
             // break and emergency-buttons
             client.println("<button onclick='sendBrake()'>Abbremsen auf 0</button>");
             client.println("<button class='stopButton' onclick='sendStop()'>Notstop</button>");
-
+    
+            // new: calibrate button
+            client.println("<button onclick='sendCalibrate()'>Kalibrieren</button>");
+    
             // javascript for control
             client.println("<script>");
             client.println("document.getElementById('toggleSwitch').addEventListener('change', function() {");
@@ -238,44 +248,55 @@ void loop() {
             client.println("    .then(response => response.text())");
             client.println("    .then(data => { document.getElementById('switchStateText').innerText = data; });");
             client.println("});");
-
+    
             client.println("function sendNumber() {");
             client.println("  let num = document.getElementById('numberInput').value;");
             client.println("  fetch('/setnum?num=' + num)");
             client.println("    .then(response => response.text())");
             client.println("    .then(data => { document.getElementById('numberDisplay').innerText = data; });");
             client.println("}");
-
+    
             client.println("function sendBrake() {");
             client.println("  fetch('/brake')");
             client.println("    .then(response => response.text())");
             client.println("}");
-
+    
             client.println("function sendStop() {");
             client.println("  fetch('/stop')");
             client.println("    .then(response => response.text())");
             client.println("}");
+    
+            client.println("function sendCalibrate() {");
+            client.println("  fetch('/calibrate')");
+            client.println("    .then(response => response.text())");
+            client.println("}");
             client.println("</script>");
-
+    
             client.println("</body></html>");
         }
-
+    
         // close connection
         client.stop();
         Serial.println("Client getrennt.");
     }
+    
 
     // **State-Machine**
-    if (csd->state == INITIALSETUP) { csd->initialSetup(ss); csd->state = CALIBRATE; };
-    if (csd->state == CALIBRATE && !csd->calibrate(ss)) csd->state = SETUP;
+    if (csd->state == INITIALSETUP) { csd->initialSetup(ss); csd->state = CALIBRATESPEED; };
+    if (csd->state == CALIBRATESPEED && !csd->calibrateSpeed(ss)) csd->state = CALIBRATEPOSITION;
+    if (csd->state == CALIBRATEPOSITION && !csd->calibratePosition()) csd->state = SLEEP;
 
     if (csd->state == SETUP) { csd->setup(ss); csd->state = ACCELERATING; };
     if (csd->state == ACCELERATING) if (csd->accelerateToVel(inputVel, ss)) csd->state = DRIVING;
     // if (csd->state == ACCELERATING) if (csd->accelerateToSpeed(inputSpeed)) csd->state = DRIVING;
     if (csd->state == DRIVING) if (csd->drive(ss)) csd->state = BREAKING;
-    if (!digitalRead(toggleBtn1)) csd->state = BREAKING;
-    if (!digitalRead(toggleBtn2)) csd->state = BREAKING;
+    if (!digitalRead(toggleBtn1) && (
+        csd->state == ACCELERATING ||
+        csd->state == DRIVING)) csd->state = BREAKING;
+    if (!digitalRead(toggleBtn2) && (
+        csd->state == ACCELERATING ||
+        csd->state == DRIVING)) csd->state = BREAKING;
     if (csd->state == BREAKING) { if (csd->breakSpeed()) csd->state = TOGGLE; }
-    if (csd->state == TOGGLE) { csd->toggle(); csd->state = SETUP; }
-    // Serial.println(csd->getSpeed());
+    if (csd->state == TOGGLE) { csd->toggleDir(); csd->state = SETUP; }
+    // Serial.println(csd->state);
 }
