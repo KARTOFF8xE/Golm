@@ -13,7 +13,7 @@
 Adafruit_seesaw ss;
 seesaw_NeoPixel sspixel = seesaw_NeoPixel(1, SS_NEOPIX, NEO_GRB + NEO_KHZ800);
 int32_t encoder_position;
-int inputSpeed = 0;         // velocity
+float inputVel = 0;         // velocity
 
 /***WiFi***/
 const char* ssid = "Arduino_AP";  // ssid
@@ -158,18 +158,18 @@ void loop() {
                 int start = pos + 4;
                 String numStr = request.substring(start);
                 numStr = numStr.substring(0, numStr.indexOf(" "));
-                inputSpeed = numStr.toInt();
+                inputVel = numStr.toFloat();
             }
             Serial.print("Input: ");
-            Serial.println(inputSpeed);
-            csd->state = SETUP;
+            Serial.println(inputVel);
+            csd->state = INITIALSETUP;
             Serial.println(csd->state);
 
 
             client.println("HTTP/1.1 200 OK");
             client.println("Content-Type: text/plain");
             client.println();
-            client.println(String(inputSpeed));
+            client.println(String(inputVel));
         }
 
         else if (request.indexOf("GET /brake") != -1) {
@@ -222,8 +222,8 @@ void loop() {
 
             // velocity-field
             client.println("<h2>Steuerung</h2>");
-            client.println("<p>Current Vel: <strong id='numberDisplay'>" + String(inputSpeed) + "</strong></p>");
-            client.println("<input type='number' id='numberInput' value='" + String(inputSpeed) + "'>");
+            client.println("<p>Current Vel: <strong id='numberDisplay'>" + String(inputVel) + "</strong></p>");
+            client.println("<input type='number' id='numberInput' value='" + String(inputVel) + "'>");
             client.println("<button onclick='sendNumber()'>Start</button>");
 
             // break and emergency-buttons
@@ -266,14 +266,16 @@ void loop() {
     }
 
     // **State-Machine**
-    if (csd->state == SETUP) { csd->setup(ss); csd->state = STARTUP; };
-    if (csd->state == STARTUP) if (csd->startup(ss)) csd->state = ACCELERATING;
-    // if (csd->state == ACCELERATING) if (csd->accelerateToVel(inputVel, ss)) csd->state = DRIVING;
-    if (csd->state == ACCELERATING) if (csd->accelerateToSpeed(inputSpeed)) csd->state = DRIVING;
+    if (csd->state == INITIALSETUP) { csd->initialSetup(ss); csd->state = CALIBRATE; };
+    if (csd->state == CALIBRATE && !csd->calibrate(ss)) csd->state = SETUP;
+
+    if (csd->state == SETUP) { csd->setup(ss); csd->state = ACCELERATING; };
+    if (csd->state == ACCELERATING) if (csd->accelerateToVel(inputVel, ss)) csd->state = DRIVING;
+    // if (csd->state == ACCELERATING) if (csd->accelerateToSpeed(inputSpeed)) csd->state = DRIVING;
     if (csd->state == DRIVING) if (csd->drive(ss)) csd->state = BREAKING;
     if (!digitalRead(toggleBtn1)) csd->state = BREAKING;
     if (!digitalRead(toggleBtn2)) csd->state = BREAKING;
     if (csd->state == BREAKING) { if (csd->breakSpeed()) csd->state = TOGGLE; }
     if (csd->state == TOGGLE) { csd->toggle(); csd->state = SETUP; }
-    Serial.println(csd->getSpeed());
+    // Serial.println(csd->getSpeed());
 }
